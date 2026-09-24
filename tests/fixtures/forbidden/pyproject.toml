@@ -1,0 +1,5 @@
+[tool.archi]
+[[tool.archi.forbidden]]
+from = "front"
+to = "back"
+include-descendants = true
