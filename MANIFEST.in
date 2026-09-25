@@ -2,3 +2,8 @@ include README.md
 include Architecture_Explorer_Product_Specification.md
 recursive-include docs *.md
 recursive-include tests *.py *.toml
+recursive-include src/archi/static *
+recursive-include ui *.json *.mjs *.ts *.tsx *.css *.html *.svg
+prune ui/node_modules
+prune ui/test-results
+prune ui/playwright-report
