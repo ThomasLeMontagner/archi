@@ -1198,9 +1198,6 @@ function Explorer({ graph, project }: { graph: Graph; project: Project }) {
                     return (
                       <g
                         key={edge.id}
-                        role="button"
-                        tabIndex={0}
-                        aria-label={`Dependency ${label(edge.source)} to ${label(edge.target)}, ${edge.evidence.length} import sites`}
                         className={`graph-edge ${edge.cyclic ? "cyclic" : ""} ${active ? "selected" : ""}`}
                         onClick={() => setSelection({ kind: "edge", edge })}
                         onKeyDown={(e) => {
@@ -1218,16 +1215,23 @@ function Explorer({ graph, project }: { graph: Graph; project: Project }) {
                             edge.cyclic ? "url(#cycle-arrow)" : "url(#arrow)"
                           }
                         />
-                        <rect
-                          x={route.x - 16}
-                          y={route.y - 12}
-                          width="32"
-                          height="24"
-                          rx="8"
-                        />
-                        <text x={route.x} y={route.y + 4} textAnchor="middle">
-                          {edge.evidence.length}
-                        </text>
+                        <g
+                          role="button"
+                          tabIndex={0}
+                          className="edge-label"
+                          aria-label={`Dependency ${label(edge.source)} to ${label(edge.target)}, ${edge.evidence.length} import sites`}
+                        >
+                          <rect
+                            x={route.x - 16}
+                            y={route.y - 12}
+                            width="32"
+                            height="24"
+                            rx="8"
+                          />
+                          <text x={route.x} y={route.y + 4} textAnchor="middle">
+                            {edge.evidence.length}
+                          </text>
+                        </g>
                       </g>
                     );
                   })}

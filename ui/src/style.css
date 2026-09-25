@@ -667,11 +667,14 @@ p {
 }
 .graph-edge.selected .edge-line,
 .graph-edge:hover .edge-line,
-.graph-edge:focus-visible .edge-line {
+.graph-edge:focus-within .edge-line {
   stroke-width: 3.5;
   stroke: #155f55;
 }
-.graph-edge:focus-visible rect {
+.edge-label:focus-visible {
+  outline: none;
+}
+.edge-label:focus-visible rect {
   stroke: #257cbd;
   stroke-width: 3;
 }

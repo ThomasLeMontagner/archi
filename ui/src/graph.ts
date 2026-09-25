@@ -206,9 +206,17 @@ export function edgePath(a: Position, b: Position, reverse: boolean) {
     y2 = b.y + (down ? 0 : 104);
   const middle = (y1 + y2) / 2,
     offset = reverse ? 24 : 0;
+  // Put the badge near its importer, away from the midpoint where opposing
+  // diagonal edges cross. Evaluate the same cubic used for the visible path.
+  const t = 0.25,
+    u = 1 - t;
   return {
     path: `M ${x1} ${y1} C ${x1 + offset} ${middle}, ${x2 + offset} ${middle}, ${x2} ${y2}`,
-    x: (x1 + x2) / 2 + offset * 0.75,
-    y: middle,
+    x:
+      u ** 3 * x1 +
+      3 * u * u * t * (x1 + offset) +
+      3 * u * t * t * (x2 + offset) +
+      t ** 3 * x2,
+    y: u ** 3 * y1 + 3 * u * t * middle + t ** 3 * y2,
   };
 }

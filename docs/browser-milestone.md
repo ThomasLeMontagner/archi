@@ -5,6 +5,11 @@ The [first milestone notes](implementation-notes.md) remain the record of
 analysis semantics. This milestone adds the packaged local explorer without
 changing graph schema 1.0 or the headless exit contract.
 
+Follow-up: [two real repository validation](real-repository-validation.md)
+records a successful remote CI matrix, real-project walkthroughs, and the
+crossing-arrow interaction fix discovered during those walkthroughs. The
+tables below preserve the original milestone verification record.
+
 ## Decisions and scope
 
 - `archi PATH` analyzes once, starts a standard-library HTTP server and opens

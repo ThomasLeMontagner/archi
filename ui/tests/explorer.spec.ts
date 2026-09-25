@@ -514,3 +514,44 @@ test("AN-03: unresolved and external records stay inspectable without guessed ar
   );
   expect(violations).toEqual([]);
 });
+
+test("UI-04: crossing arrows have separate clickable evidence badges", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await open(page, "crossing");
+  const first = page.getByRole("button", {
+    name: "Dependency b to c, 1 import sites",
+    exact: true,
+  });
+  const second = page.getByRole("button", {
+    name: "Dependency d to a, 1 import sites",
+    exact: true,
+  });
+  const a = await first.locator("rect").boundingBox();
+  const b = await second.locator("rect").boundingBox();
+  expect(a).not.toBeNull();
+  expect(b).not.toBeNull();
+  expect(
+    a!.x + a!.width <= b!.x ||
+      b!.x + b!.width <= a!.x ||
+      a!.y + a!.height <= b!.y ||
+      b!.y + b!.height <= a!.y,
+  ).toBeTruthy();
+  await first.click();
+  await expect(
+    page.getByRole("heading", { name: "b → c", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.locator(".inspector-content .evidence-location"),
+  ).toHaveText(["b/main.py:1"]);
+  await second.click();
+  await expect(
+    page.getByRole("heading", { name: "d → a", exact: true }),
+  ).toBeVisible();
+  await first.focus();
+  await page.keyboard.press("Enter");
+  await expect(
+    page.getByRole("heading", { name: "b → c", exact: true }),
+  ).toBeVisible();
+});
