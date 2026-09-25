@@ -287,7 +287,7 @@ class CliAcceptance(unittest.TestCase):
             self.assertEqual(help_result.returncode, 0)
             self.assertIn("check", help_result.stdout)
             self.assertIn("export", help_result.stdout)
-            self.assertIn("next milestone", help_result.stdout)
+            self.assertIn("local browser explorer", help_result.stdout)
             stdout = run_cli("export", FIXTURES / "cycles", cwd=folder)
             self.assertEqual(stdout.returncode, 0)  # Policy violations do not prevent export.
             self.assertEqual(stdout.stderr, "")

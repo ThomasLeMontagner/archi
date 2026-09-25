@@ -1,5 +1,8 @@
 # Milestone 1 implementation and acceptance notes
 
+Historical record for v0.1.0. See [Milestone 2](browser-milestone.md) for the
+current browser implementation and acceptance status.
+
 Source: **Architecture Explorer and Linter Product Specification v0.1**.
 Scope: Python analysis core and headless CLI. Requirement IDs below retain
 their meaning from the specification; implementing the backend of a browser
