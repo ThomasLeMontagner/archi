@@ -555,3 +555,202 @@ test("UI-04: crossing arrows have separate clickable evidence badges", async ({
     page.getByRole("heading", { name: "b → c", exact: true }),
   ).toBeVisible();
 });
+
+test("MET-01/02/03: package metrics stay fixed across navigation and expose every contributing import", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await open(page, "metrics");
+  await page
+    .getByRole("button", { name: "Select package alpha", exact: true })
+    .click();
+  const panel = page.getByRole("region", { name: "Package import metrics" });
+  const counts = async () => {
+    await expect(panel.getByTestId("metric-incoming")).toHaveText("1");
+    await expect(panel.getByTestId("metric-outgoing")).toHaveText("2");
+    await expect(panel.getByTestId("metric-instability")).toHaveText("0.67");
+  };
+  await counts();
+  await expect(panel.getByTestId("metric-coverage")).toHaveText(
+    "Excluded outgoing references: 1 external · 1 uncertain · 1 unresolved.",
+  );
+  await expect(
+    panel.getByText("2 import sites involving root-level modules excluded"),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Next map page", exact: true })
+    .click();
+  await counts();
+  await page
+    .getByRole("button", { name: "Previous map page", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Expand package alpha", exact: true })
+    .click();
+  await counts();
+  await page.getByRole("button", { name: "Back to previous view" }).click();
+  await counts();
+  await panel.getByText("Outgoing packages (2)", { exact: true }).click();
+  await panel
+    .getByRole("button", { name: "Inspect outgoing imports beta", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "alpha → beta", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.locator(".inspector-content .evidence-location"),
+  ).toHaveText([
+    "alpha/main.py:1",
+    "alpha/main.py:2",
+    "alpha/main.py:3",
+    "alpha/main.py:7",
+    "alpha/nested/worker.py:1",
+  ]);
+  await page
+    .getByRole("button", {
+      name: "Inspect module dependency alpha.main to beta.one",
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.locator(".inspector-content .evidence-location"),
+  ).toHaveText(["alpha/main.py:1", "alpha/main.py:2"]);
+  await page.getByRole("button", { name: "Back to package metrics" }).click();
+  await counts();
+  await panel.getByText("Incoming packages (1)", { exact: true }).click();
+  await panel
+    .getByRole("button", {
+      name: "Inspect incoming imports delta",
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "delta → alpha", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.locator(".inspector-content .evidence-location"),
+  ).toHaveText(["delta/client.py:1", "delta/client.py:2"]);
+  await page.getByRole("button", { name: "Back to package metrics" }).click();
+  await panel.getByText("Outgoing packages (2)", { exact: true }).click();
+  await panel
+    .getByRole("button", { name: "Show package beta", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "beta", exact: true }),
+  ).toBeVisible();
+  await expect(panel.getByTestId("metric-incoming")).toHaveText("2");
+  await expect(panel.getByTestId("metric-instability")).toHaveText("0.00");
+});
+
+test("MET-04/05: metrics are informational, accessible, and isolated packages show N/A", async ({
+  page,
+}) => {
+  await open(page, "metrics");
+  await page
+    .getByRole("button", { name: "Select package alpha", exact: true })
+    .click();
+  const panel = page.getByRole("region", { name: "Package import metrics" });
+  await panel.getByText("Counting rules and coverage", { exact: true }).click();
+  await expect(panel).toContainText(
+    "not Martin’s class-based metric or a lint rule",
+  );
+  await panel.getByText("Outgoing packages (2)", { exact: true }).click();
+  const inspect = panel.getByRole("button", {
+    name: "Inspect outgoing imports beta",
+    exact: true,
+  });
+  await inspect.focus();
+  await page.keyboard.press("Enter");
+  await expect(
+    page.getByRole("heading", { name: "alpha → beta", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Back to package metrics" }).click();
+  await panel.getByText("Incoming packages (1)", { exact: true }).click();
+  await panel.getByText("Outgoing packages (2)", { exact: true }).click();
+  await panel.getByText("Counting rules and coverage", { exact: true }).click();
+  await panel
+    .getByText("2 import sites involving root-level modules excluded", {
+      exact: true,
+    })
+    .click();
+  await page.evaluate(axe.source);
+  for (const width of [1440, 1024]) {
+    await page.setViewportSize({ width, height: width === 1440 ? 900 : 768 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBeTruthy();
+    const violations = await page.evaluate(async () =>
+      (window as any).axe.run(document).then((r: any) =>
+        r.violations.map((v: any) => ({
+          id: v.id,
+          targets: v.nodes.map((n: any) => n.target),
+        })),
+      ),
+    );
+    expect(violations).toEqual([]);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mkdir(resolve(root, ".artifacts"), { recursive: true });
+  await panel
+    .getByRole("heading", { name: "Package-import instability" })
+    .scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: resolve(root, ".artifacts/package-metrics.png"),
+  });
+  const cli = globalThis.process.env.ARCHI_TEST_CLI;
+  const result = spawnSync(
+    cli || "python3",
+    cli
+      ? ["check", resolve(root, "tests/fixtures/metrics")]
+      : ["-m", "archi", "check", resolve(root, "tests/fixtures/metrics")],
+    {
+      cwd: root,
+      env: {
+        ...globalThis.process.env,
+        PYTHONPATH: cli ? "" : resolve(root, "src"),
+      },
+      encoding: "utf8",
+    },
+  );
+  expect(result.status).toBe(0);
+  await expect(
+    page.getByText("No rule violations", { exact: false }),
+  ).toBeVisible();
+  await page.keyboard.press("Control+k");
+  await page
+    .getByRole("textbox", { name: "Search packages and modules" })
+    .fill("isolated");
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "isolated isolated Package", exact: true })
+    .click();
+  await expect(panel.getByTestId("metric-instability")).toHaveText("N/A");
+  await expect(panel.getByTestId("metric-incoming")).toHaveText("0");
+  await expect(panel.getByTestId("metric-outgoing")).toHaveText("0");
+  await page.keyboard.press("Control+k");
+  await page
+    .getByRole("textbox", { name: "Search packages and modules" })
+    .fill("isolated.lone");
+  await page
+    .getByRole("dialog")
+    .getByRole("button", {
+      name: "isolated.lone isolated/lone.py Module",
+      exact: true,
+    })
+    .click();
+  await expect(panel).toHaveCount(0);
+});
+
+test("MET-04: incomplete analysis labels metrics provisional", async ({
+  page,
+}) => {
+  await open(page, "malformed");
+  await page
+    .getByRole("button", { name: "Select package pkg", exact: true })
+    .click();
+  const panel = page.getByRole("region", { name: "Package import metrics" });
+  await expect(panel.getByRole("note")).toContainText("Analysis is incomplete");
+  await expect(panel.getByTestId("metric-instability")).toHaveText("N/A");
+});

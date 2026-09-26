@@ -16,6 +16,11 @@ import {
   projectEdges,
 } from "./graph";
 import type { Index } from "./graph";
+import {
+  packageMetrics,
+  type PackageMetrics,
+  type PackageContributor,
+} from "./metrics";
 import type {
   Camera,
   Diagnostic,
@@ -166,6 +171,129 @@ function Sites({ sites }: { sites: Site[] }) {
         )}
       />
     </div>
+  );
+}
+
+function PackageMetricsPanel({
+  metrics,
+  inspect,
+  reveal,
+}: {
+  metrics: PackageMetrics;
+  inspect: (contributor: PackageContributor) => void;
+  reveal: (node: GraphNode) => void;
+}) {
+  const incoming = metrics.incoming.length,
+    outgoing = metrics.outgoing.length;
+  return (
+    <section className="package-metrics" aria-label="Package import metrics">
+      <h3>Package-import instability</h3>
+      <p className="small muted">Informational · confirmed local imports</p>
+      <dl className="package-metric-values">
+        <div>
+          <dt>Incoming packages</dt>
+          <dd data-testid="metric-incoming">{incoming}</dd>
+        </div>
+        <div>
+          <dt>Outgoing packages</dt>
+          <dd data-testid="metric-outgoing">{outgoing}</dd>
+        </div>
+        <div>
+          <dt>Instability</dt>
+          <dd data-testid="metric-instability">
+            {metrics.instability === null
+              ? "N/A"
+              : metrics.instability.toFixed(2)}
+          </dd>
+        </div>
+      </dl>
+      <p className="small muted">
+        {metrics.instability === null
+          ? "No confirmed dependencies crossing this package boundary to other packages."
+          : `${outgoing} / (${incoming} + ${outgoing}). A higher value means more outgoing coupling relative to incoming coupling, not lower quality.`}
+      </p>
+      {!metrics.complete && (
+        <p className="metric-note" role="note">
+          Analysis is incomplete. These provisional values use only the
+          confirmed imports available.
+        </p>
+      )}
+      {(["incoming", "outgoing"] as const).map((direction) => (
+        <details className="metric-contributors" key={direction}>
+          <summary>
+            {direction === "incoming" ? "Incoming" : "Outgoing"} packages (
+            {metrics[direction].length})
+          </summary>
+          {!metrics[direction].length && (
+            <p className="small muted">No contributing packages.</p>
+          )}
+          <Paged
+            items={metrics[direction]}
+            label={`${direction} packages`}
+            pageSize={10}
+            render={(contributor) => (
+              <div className="metric-contributor" key={contributor.node.id}>
+                <button
+                  className="metric-package-link"
+                  onClick={() => reveal(contributor.node)}
+                  aria-label={`Show package ${contributor.node.name}`}
+                >
+                  {contributor.node.name}
+                  <Icon name="arrow" size={14} />
+                </button>
+                <small className="muted">{contributor.node.path}</small>
+                <button
+                  className="metric-evidence-link"
+                  onClick={() => inspect(contributor)}
+                  aria-label={`Inspect ${direction} imports ${contributor.node.name}`}
+                >
+                  {contributor.dependency.evidence.length} import sites · View
+                  evidence
+                </button>
+              </div>
+            )}
+          />
+        </details>
+      ))}
+      <details className="metric-definition">
+        <summary>Counting rules and coverage</summary>
+        <p>
+          The selected package includes all descendants. Internal imports are
+          excluded. Each outside package counts once per direction, using the
+          module’s immediate owning package. Nested outside packages count
+          separately; an ancestor counts only for imports outside the selected
+          subtree. Counts do not depend on map expansion or paging.
+        </p>
+        <p>
+          Instability = outgoing / (incoming + outgoing). Isolated packages show
+          N/A. This is an import-based adaptation, not Martin’s class-based
+          metric or a lint rule.
+        </p>
+        <p>
+          Excluded references originate in this package and its descendants.
+          Incoming unresolved dependencies cannot be attributed reliably.
+          External dependencies are not inspected.
+        </p>
+      </details>
+      <p className="metric-coverage" data-testid="metric-coverage">
+        Excluded outgoing references: {metrics.excluded.external} external ·{" "}
+        {metrics.excluded.uncertain} uncertain · {metrics.excluded.unresolved}{" "}
+        unresolved.
+      </p>
+      {!!metrics.ungroupedSites.length && (
+        <details className="metric-definition">
+          <summary>
+            {metrics.ungroupedSites.length} import sites involving root-level
+            modules excluded
+          </summary>
+          <p>
+            Root-level modules have no owning package and do not contribute to
+            package counts.
+          </p>
+          <Sites sites={metrics.ungroupedSites} />
+        </details>
+      )}
+    </section>
   );
 }
 
@@ -326,6 +454,10 @@ function Explorer({ graph, project }: { graph: Graph; project: Project }) {
   );
   const chain = ancestors(scope, index);
   const selectedId = selection?.kind === "node" ? selection.id : null;
+  const metrics = useMemo(
+    () => (selectedId ? packageMetrics(graph, index, selectedId) : null),
+    [graph, index, selectedId],
+  );
   const emphasized = new Set(
     selectedDiagnostic?.edge_ids.flatMap((id) =>
       index.edgeMap.get(id)?.supporting_edges.length
@@ -520,6 +652,16 @@ function Explorer({ graph, project }: { graph: Graph; project: Project }) {
       return (
         <>
           <p className="eyebrow">Dependency</p>
+          {selection.returnNodeId && (
+            <button
+              className="secondary full"
+              onClick={() =>
+                setSelection({ kind: "node", id: selection.returnNodeId! })
+              }
+            >
+              Back to package metrics
+            </button>
+          )}
           <h2 id="inspector-title">
             {label(edge.source)} <span className="direction">→</span>{" "}
             {label(edge.target)}
@@ -548,7 +690,11 @@ function Explorer({ graph, project }: { graph: Graph; project: Project }) {
                   key={e.id}
                   className="dependency-row"
                   onClick={() =>
-                    setSelection({ kind: "edge", edge: fromEdge(e) })
+                    setSelection({
+                      kind: "edge",
+                      edge: fromEdge(e),
+                      returnNodeId: selection.returnNodeId,
+                    })
                   }
                   aria-label={`Inspect module dependency ${label(e.source)} to ${label(e.target)}`}
                 >
@@ -692,10 +838,10 @@ function Explorer({ graph, project }: { graph: Graph; project: Project }) {
               <strong>{index.counts.get(node.id)}</strong> modules
             </span>
             <span>
-              <strong>{outgoing.length}</strong> outgoing
+              <strong>{outgoing.length}</strong> outgoing edges
             </span>
             <span>
-              <strong>{incoming.length}</strong> incoming
+              <strong>{incoming.length}</strong> incoming edges
             </span>
           </div>
           {node.kind === "group" && node.id !== scope && (
@@ -709,6 +855,20 @@ function Explorer({ graph, project }: { graph: Graph; project: Project }) {
               <Icon name="focus" />
               Focus on map
             </button>
+          )}
+          {metrics && (
+            <PackageMetricsPanel
+              key={node.id}
+              metrics={metrics}
+              reveal={reveal}
+              inspect={(contributor) =>
+                setSelection({
+                  kind: "edge",
+                  edge: contributor.dependency,
+                  returnNodeId: node.id,
+                })
+              }
+            />
           )}
           <h3>Outgoing dependencies</h3>
           {!outgoing.length && (
@@ -1062,7 +1222,9 @@ function Explorer({ graph, project }: { graph: Graph; project: Project }) {
                   disabled={page === 0}
                   onClick={() => {
                     setPage(page - 1);
-                    setSelection(null);
+                    setSelection((current) =>
+                      current?.kind === "node" ? current : null,
+                    );
                   }}
                 >
                   ←
@@ -1072,7 +1234,9 @@ function Explorer({ graph, project }: { graph: Graph; project: Project }) {
                   disabled={(page + 1) * pageSize >= children.length}
                   onClick={() => {
                     setPage(page + 1);
-                    setSelection(null);
+                    setSelection((current) =>
+                      current?.kind === "node" ? current : null,
+                    );
                   }}
                 >
                   →

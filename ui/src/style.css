@@ -1053,6 +1053,84 @@ p {
 .direction {
   color: #729076;
 }
+.package-metrics {
+  margin-top: 22px;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.package-metrics h3 {
+  margin-top: 0;
+}
+.package-metric-values {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 10px;
+  margin: 18px 0;
+}
+.package-metric-values dt {
+  font-size: 11px;
+  color: #536b55;
+}
+.package-metric-values dd {
+  margin: 4px 0 0;
+  font-size: 25px;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+}
+.package-metric-values > div:last-child {
+  grid-column: 1 / -1;
+}
+.metric-contributors,
+.metric-definition {
+  margin-top: 12px;
+  font-size: 12px;
+}
+.metric-contributors summary,
+.metric-definition summary {
+  cursor: pointer;
+  padding: 8px 0;
+  line-height: 1.6;
+}
+.metric-contributor {
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.metric-package-link {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.metric-package-link svg {
+  flex-shrink: 0;
+}
+.metric-contributor > small {
+  display: block;
+  font-size: 10px;
+  margin: 4px 0;
+}
+.metric-evidence-link {
+  color: var(--green);
+  font-size: 11px;
+  padding: 8px 0;
+  text-align: left;
+  text-decoration: underline;
+}
+.metric-note {
+  padding: 10px;
+  background: #fff8ee;
+  border: 1px solid #d8ae8e;
+  border-radius: 5px;
+}
+.metric-coverage {
+  color: #536b55;
+  line-height: 1.7;
+}
 .evidence {
   margin: 0 0 10px;
   border: 1px solid #dfe7d8;

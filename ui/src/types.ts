@@ -78,7 +78,7 @@ export interface Camera {
 }
 export type Selection =
   | { kind: "node"; id: string }
-  | { kind: "edge"; edge: ViewEdge }
+  | { kind: "edge"; edge: ViewEdge; returnNodeId?: string }
   | { kind: "diagnostic"; id: string }
   | { kind: "issues" }
   | { kind: "references" }
