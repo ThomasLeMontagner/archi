@@ -58,7 +58,7 @@ def main():
                     assert content
                     if path == 'api/graph':
                         graph = json.loads(content)
-                        assert graph['schema_version'] == '1.0' and graph['complete']
+                        assert graph['schema_version'] == '2.0' and graph['complete']
             print('PASS: installed wheel, no Node in PATH, check exits 0/1/2, browser page, compiled assets, graph API.')
         finally:
             server.terminate()

@@ -1,6 +1,7 @@
 """Aggregation depends only on the neutral node hierarchy (IR-02)."""
 
 from collections import defaultdict
+from dataclasses import replace
 
 from archi.model import Edge, Node, stable_id
 
@@ -41,3 +42,11 @@ def aggregate_dependencies(nodes: list[Node], edges: list[Edge], depth: int | No
         supporting[pair].add(edge.id)
     return [Edge(stable_id("edge", "group_dependency", *pair), "group_dependency", *pair,
                  tuple(sorted(sites[pair])), tuple(sorted(supporting[pair]))) for pair in sorted(sites)]
+
+
+def without_type_only(nodes: list[Node], edges: list[Edge]) -> list[Edge]:
+    """Filter individual sites, then rebuild aggregate evidence and support IDs."""
+    direct = [replace(edge, evidence=tuple(s for s in edge.evidence if not s.type_only))
+              for edge in edges if edge.kind != "group_dependency"]
+    direct = [edge for edge in direct if edge.evidence]
+    return direct + aggregate_dependencies(nodes, direct)

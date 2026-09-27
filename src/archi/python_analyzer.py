@@ -26,6 +26,70 @@ class Module:
     package: str
 
 
+def import_sites(tree: ast.Module, *, typing_is_local: bool = False):
+    """Conservatively recognize unshadowed, explicit module-level typing imports.
+
+    Unknown guards remain ordinary imports. Never evaluate expressions or import
+    typing from the analyzed repository. Bindings anywhere in the file invalidate
+    an alias, deliberately preferring false negatives over hiding dependencies.
+    """
+    aliases = {}
+    declarations = set()
+    if not typing_is_local:
+        for statement in tree.body:
+            if isinstance(statement, ast.Import):
+                for alias in statement.names:
+                    if alias.name == "typing":
+                        aliases[alias.asname or "typing"] = ("module", statement.lineno)
+                        declarations.add(id(alias))
+            elif isinstance(statement, ast.ImportFrom) and statement.module == "typing" and not statement.level:
+                for alias in statement.names:
+                    if alias.name == "TYPE_CHECKING":
+                        aliases[alias.asname or alias.name] = ("flag", statement.lineno)
+                        declarations.add(id(alias))
+    invalid = set()
+    for item in ast.walk(tree):
+        if isinstance(item, ast.Name) and isinstance(item.ctx, (ast.Store, ast.Del)):
+            invalid.add(item.id)
+        elif isinstance(item, ast.arg):
+            invalid.add(item.arg)
+        elif isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            invalid.add(item.name)
+        elif isinstance(item, ast.ExceptHandler) and item.name:
+            invalid.add(item.name)
+        elif isinstance(item, (ast.MatchAs, ast.MatchStar)) and item.name:
+            invalid.add(item.name)
+        elif isinstance(item, ast.MatchMapping) and item.rest:
+            invalid.add(item.rest)
+        elif isinstance(item, ast.alias) and id(item) not in declarations:
+            if item.name == "*":
+                invalid.update(aliases)
+            invalid.add(item.asname or item.name.split(".")[0])
+        elif isinstance(item, ast.Attribute) and isinstance(item.ctx, (ast.Store, ast.Del)):
+            if isinstance(item.value, ast.Name):
+                invalid.add(item.value.id)
+    aliases = {name: binding for name, binding in aliases.items() if name not in invalid}
+
+    def guard(test):
+        if isinstance(test, ast.Name):
+            return aliases.get(test.id, (None, 0))[0] == "flag" and aliases[test.id][1] < test.lineno
+        if isinstance(test, ast.Attribute) and test.attr == "TYPE_CHECKING" and isinstance(test.value, ast.Name):
+            binding = aliases.get(test.value.id, (None, 0))
+            return binding[0] == "module" and binding[1] < test.lineno
+        return False
+
+    pending = [(tree, False)]
+    while pending:
+        node, type_only = pending.pop()
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            yield node, type_only
+        if isinstance(node, ast.If) and guard(node.test):
+            pending.extend((child, True) for child in node.body)
+            pending.extend((child, type_only) for child in node.orelse)
+        else:
+            pending.extend((child, type_only) for child in ast.iter_child_nodes(node))
+
+
 class PythonAnalyzer:
     def analyze(self, root: Path, config: Config) -> Graph:
         root = root.resolve()
@@ -120,11 +184,9 @@ class PythonAnalyzer:
             except RecursionError:
                 graph.issues.append(Issue("parse-error", module.node.path, "Source exceeds parser nesting limits"))
                 continue
-            for statement in ast.walk(tree):
-                if not isinstance(statement, (ast.Import, ast.ImportFrom)):
-                    continue
+            for statement, type_only in import_sites(tree, typing_is_local="typing" in local_tops):
                 evidence = Evidence(module.node.path, statement.lineno, statement.col_offset,
-                                    ast.get_source_segment(source, statement) or "")
+                                    ast.get_source_segment(source, statement) or "", type_only)
                 if isinstance(statement, ast.Import):
                     for alias in statement.names:
                         resolve(module, alias.name, evidence)

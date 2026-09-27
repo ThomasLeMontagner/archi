@@ -1,18 +1,18 @@
-# Graph contract, version 1.0
+# Graph contract, version 2.0
 
 `archi.model` contains the normative typed schema. `Graph.from_json(text)`
 strictly checks field names, primitive types, schema version, counts,
 hierarchy, relative paths, and node/edge references. The format is ordinary
 UTF-8 JSON and does not require Python-specific syntax or objects. Breaking
-schema changes require a new major version; the v1 reader rejects unknown
+schema changes require a new major version; the v2 reader rejects unknown
 versions rather than silently interpreting them.
 
 Every export has these fields:
 
 | Field | Meaning |
 | --- | --- |
-| `schema_version` | String `"1.0"` |
-| `analyzer` | String metadata map, currently name, version, language |
+| `schema_version` | String `"2.0"` |
+| `analyzer` | String metadata map, currently name, version, language, include_type_only |
 | `complete` | False if any analysis issues occurred |
 | `nodes` | ID, kind, name, parent_id (nullable), root-relative path |
 | `edges` | ID, kind, source ID, target ID, evidence, supporting_edges, count |
@@ -33,7 +33,9 @@ Imports of a regular package target its initializer; namespace imports target
 the group itself. The root group has no parent.
 
 Evidence records contain `path`, one-based `line`, zero-based `column`, and
-the exact statement `text` (with normalized newlines). Python columns use
+the exact statement `text` (with normalized newlines), and a required boolean
+`type_only`. The boolean marks recognized type-only guards; false means not
+recognized as type-only, not proof of runtime execution. Python columns use
 AST UTF-8 byte offsets. Other adapters must document their column units;
 no Python expression grammar is required for the text. Multiple aliases on
 one statement share a site; semicolon-separated statements have different
@@ -64,3 +66,19 @@ Moving an otherwise identical repository does not affect the export.
 The exported data includes import statement text, but no other source
 contents. The caller already knows the analyzed root; a future browser host
 can provide that display context separately from the deterministic graph.
+
+## Version 2.0 and type-only policy
+
+Version 2.0 adds `Evidence.type_only` to import, reference, aggregate and diagnostic
+sites. This is language-neutral evidence metadata; future adapters can classify
+analogous dependencies. The strict reader rejects 1.0 rather than assuming its
+unclassified imports are ordinary. Regenerate older snapshots with this analyzer.
+Edge identity and site counts do not split by type: a mixed dependency preserves
+all its sites on one edge. Site location remains path/line/column/text.
+
+Exports always retain type-only edges and references. The analyzer metadata
+`include_type_only` is `"true"` or `"false"`, recording the configured lint policy.
+When false, rules filter individual sites and rebuild aggregates before checking;
+diagnostic evidence contains only included sites. An edge ID in a diagnostic may
+reference a mixed edge whose full exported evidence also contains excluded sites.
+The browser filter does not alter exported diagnostics or the repository policy.

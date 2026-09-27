@@ -70,6 +70,55 @@ The server serves an immutable snapshot. Rerun Archi after source changes.
 It binds only to `127.0.0.1`, uses no external assets, sends no telemetry, and
 serves only the bundled UI and graph metadata—not repository file URLs.
 
+## Package metrics
+
+Selecting a package shows **incoming packages**, **outgoing packages**, and
+**package-import instability**: `outgoing / (incoming + outgoing)`. An isolated
+package shows **N/A**. Open either contributor list to reveal a package or
+inspect the exact imports behind its count. These are informational metrics;
+high instability is not a lint failure or a quality score.
+
+The selected package includes all descendants. Internal imports are excluded;
+each outside package counts once per direction, using the module's immediate
+owning package. Nested outside packages count separately. The definition stays
+fixed when the map expands or pages, and selected-package details remain open
+while paging. Existing incoming/outgoing **edge** counts remain separate from
+these distinct **package** counts.
+
+Only confirmed local imports contribute. The inspector reports excluded
+external, uncertain and unresolved reference records originating in the
+selected subtree, plus import sites involving root-level modules without a
+package. Incomplete graphs show a provisional-values notice. This is an
+import-based adaptation, not Martin's original class-based metric; Abstractness
+and a Stable Dependencies rule are not implemented. See the
+[metric decisions and acceptance notes](docs/package-metrics.md).
+
+## Type-only imports
+
+Archi labels imports inside recognized `if TYPE_CHECKING:` blocks **Type-only**
+(including `typing.TYPE_CHECKING` and explicit aliases imported from `typing`).
+They remain included by default. Uncheck **Include type-only imports in map and
+metrics** to hide those sites and recalculate package metrics. Ordinary sites on
+mixed dependencies remain visible. Export always retains every import.
+
+Lint policy is independent of the browser filter. To exclude recognized type-only
+sites from both cycle and forbidden-dependency checks:
+
+```toml
+[tool.archi]
+include-type-only = false
+```
+
+The default is `true`. The browser states the configured rule policy; opening a
+rule restores all imports so its evidence can be inspected. Recognition is
+conservative: shadowed names, compound/negated conditions and dynamic aliases
+remain ordinary imports. Excluding recognized type-only imports does not turn
+the static graph into a runtime execution graph.
+
+This unreleased change exports **graph schema 2.0**, adding a required
+`type_only` boolean to every evidence site. Schema 1.0 consumers need updating.
+See [type-only decisions and acceptance notes](docs/type-only-imports.md).
+
 ## Configuration
 
 Configuration is read only from the **target directory's** `pyproject.toml`.

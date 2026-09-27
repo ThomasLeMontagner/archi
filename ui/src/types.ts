@@ -3,6 +3,7 @@ export interface Site {
   line: number;
   column: number;
   text: string;
+  type_only: boolean;
 }
 export interface GraphNode {
   id: string;
@@ -78,7 +79,7 @@ export interface Camera {
 }
 export type Selection =
   | { kind: "node"; id: string }
-  | { kind: "edge"; edge: ViewEdge }
+  | { kind: "edge"; edge: ViewEdge; returnNodeId?: string }
   | { kind: "diagnostic"; id: string }
   | { kind: "issues" }
   | { kind: "references" }

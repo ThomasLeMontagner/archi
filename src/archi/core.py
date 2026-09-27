@@ -18,6 +18,7 @@ def analyze(path: str | Path, *, adapter: Analyzer | None = None, config: Config
     graph = (adapter or PythonAnalyzer()).analyze(root, config)
     graph.edges = [e for e in graph.edges if e.kind != "group_dependency"]
     graph.edges.extend(aggregate_dependencies(graph.nodes, graph.edges))
+    graph.analyzer["include_type_only"] = str(config.include_type_only).lower()
     graph.diagnostics = check_rules(graph, config)
     graph.validate()
     return graph

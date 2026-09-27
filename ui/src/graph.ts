@@ -220,3 +220,32 @@ export function edgePath(a: Position, b: Position, reverse: boolean) {
     y: u ** 3 * y1 + 3 * u * t * middle + t ** 3 * y2,
   };
 }
+
+/** TC-03: site-level filtering retains ordinary sites on mixed dependencies. */
+export function withoutTypeOnly(graph: Graph): Graph {
+  const direct = graph.edges
+    .filter((e) => e.kind === "imports")
+    .map((e) => {
+      const evidence = e.evidence.filter((s) => !s.type_only);
+      return { ...e, evidence, count: evidence.length };
+    })
+    .filter((e) => e.count > 0);
+  const ids = new Set(direct.map((e) => e.id));
+  const aggregates = graph.edges
+    .filter((e) => e.kind !== "imports")
+    .map((e) => {
+      const evidence = e.evidence.filter((s) => !s.type_only);
+      return {
+        ...e,
+        evidence,
+        count: evidence.length,
+        supporting_edges: e.supporting_edges.filter((id) => ids.has(id)),
+      };
+    })
+    .filter((e) => e.count > 0);
+  return {
+    ...graph,
+    edges: [...direct, ...aggregates],
+    unresolved: graph.unresolved.filter((r) => !r.evidence.type_only),
+  };
+}
