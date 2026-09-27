@@ -1,9 +1,10 @@
 """Language-independent rule engine (RL-01 through RL-04)."""
 
 from collections import defaultdict, deque
+from dataclasses import replace
 
 from archi.config import Config, ConfigError
-from archi.graph import owner
+from archi.graph import owner, without_type_only
 from archi.model import Diagnostic, Graph, stable_id
 
 
@@ -67,6 +68,8 @@ def _cycle(members: tuple[str, ...], adjacency: dict[str, list[str]]) -> tuple[s
 
 
 def check_rules(graph: Graph, config: Config) -> list[Diagnostic]:
+    if not config.include_type_only:
+        graph = replace(graph, edges=without_type_only(graph.nodes, graph.edges))
     nodes = {n.id: n for n in graph.nodes}
     diagnostics = []
     if config.no_cycles:

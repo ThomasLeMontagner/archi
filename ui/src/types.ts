@@ -3,6 +3,7 @@ export interface Site {
   line: number;
   column: number;
   text: string;
+  type_only: boolean;
 }
 export interface GraphNode {
   id: string;

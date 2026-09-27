@@ -754,3 +754,74 @@ test("MET-04: incomplete analysis labels metrics provisional", async ({
   await expect(panel.getByRole("note")).toContainText("Analysis is incomplete");
   await expect(panel.getByTestId("metric-instability")).toHaveText("N/A");
 });
+
+test("TC-03: type-only evidence, map filtering, metrics, and independent rule scope", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const url = await open(page, "type_checking");
+  const toggle = page.getByRole("checkbox", {
+    name: "Include type-only imports in map and metrics",
+  });
+  await expect(toggle).toBeChecked();
+  await page
+    .getByRole("button", { name: "Select package a", exact: true })
+    .click();
+  await expect(page.getByTestId("metric-outgoing")).toHaveText("2");
+  await expect(page.getByTestId("metric-instability")).toHaveText("0.67");
+  await page
+    .getByRole("button", {
+      name: "Dependency a to b, 3 import sites",
+      exact: true,
+    })
+    .click();
+  await expect(page.locator(".inspector-content .evidence .badge")).toHaveText([
+    "Type-only",
+    "Type-only",
+    "Type-only",
+  ]);
+  await page
+    .getByRole("button", { name: "Select package a", exact: true })
+    .click();
+  await toggle.focus();
+  await page.keyboard.press("Space");
+  await expect(toggle).not.toBeChecked();
+  await expect(
+    page.getByRole("button", {
+      name: "Dependency a to b, 3 import sites",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", {
+      name: "Dependency a to c, 2 import sites",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(page.getByTestId("metric-outgoing")).toHaveText("1");
+  await expect(page.getByTestId("metric-instability")).toHaveText("0.50");
+  await expect(
+    page.getByText(/Rule checks include type-only imports/),
+  ).toBeVisible();
+  const exported = await (await page.request.get(`${url}api/graph`)).json();
+  expect(exported.schema_version).toBe("2.0");
+  expect(
+    exported.edges.some((e: { evidence: { type_only: boolean }[] }) =>
+      e.evidence.some((s) => s.type_only),
+    ),
+  ).toBe(true);
+  await page.locator(".diagnostic-button").first().click();
+  await expect(toggle).toBeChecked();
+  await expect(page.locator(".inspector-content")).toContainText("Type-only");
+  for (const width of [1440, 1024]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.evaluate(axe.source);
+    const results = await page.evaluate(async () => (window as any).axe.run());
+    expect(results.violations).toEqual([]);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+  }
+});

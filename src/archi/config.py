@@ -22,6 +22,7 @@ class Config:
     exclude: tuple[str, ...] = ()
     no_cycles: bool = True
     forbidden: tuple[ForbiddenRule, ...] = ()
+    include_type_only: bool = True
 
 
 def _relative(value: str) -> bool:
@@ -45,7 +46,7 @@ def load_config(root: Path) -> Config:
     table = tool.get("archi", {})
     if not isinstance(table, dict):
         raise ConfigError("tool.archi must be a table")
-    unknown = set(table) - {"source-roots", "exclude", "no-cycles", "forbidden"}
+    unknown = set(table) - {"source-roots", "exclude", "no-cycles", "forbidden", "include-type-only"}
     if unknown:
         raise ConfigError(f"Unknown tool.archi keys: {', '.join(sorted(unknown))}")
     for key in ("source-roots", "exclude"):
@@ -68,6 +69,9 @@ def load_config(root: Path) -> Config:
     no_cycles = table.get("no-cycles", True)
     if type(no_cycles) is not bool:
         raise ConfigError("no-cycles must be a boolean")
+    include_type_only = table.get("include-type-only", True)
+    if type(include_type_only) is not bool:
+        raise ConfigError("include-type-only must be a boolean")
     rules = table.get("forbidden", [])
     if not isinstance(rules, list):
         raise ConfigError("forbidden must be an array of tables")
@@ -81,4 +85,5 @@ def load_config(root: Path) -> Config:
             raise ConfigError("include-descendants must be a boolean")
         forbidden.append(ForbiddenRule(rule["from"], rule["to"], rule["include-descendants"]))
     return Config(roots, tuple(sorted(set(table.get("exclude", [])))), no_cycles,
-                  tuple(sorted(set(forbidden), key=lambda r: (r.source, r.target, r.include_descendants))))
+                  tuple(sorted(set(forbidden), key=lambda r: (r.source, r.target, r.include_descendants))),
+                  include_type_only)

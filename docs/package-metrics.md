@@ -8,7 +8,7 @@ and RL-03 (opt-in policy). No new architecture judgment is enabled.
 ## Definition and decisions
 
 The inspector computes **package-import instability** from confirmed local
-`imports` edges in graph schema 1.0:
+`imports` edges in the architecture graph:
 
 `I = outgoing packages / (incoming packages + outgoing packages)`
 
@@ -54,8 +54,9 @@ Ambiguities settled for this implementation:
   including a return to the originating package's metrics.
 - **Compatibility:** this is a pure TypeScript graph calculation, memoized for
   the selected node. No Python syntax or package-name splitting is used.
-  Schema 1.0, `archi export`, `archi check`, diagnostics, configuration and exit
-  codes are unchanged. Metrics are not serialized into exports in this version.
+  The initial metrics change left schema 1.0, CLI diagnostics and exit codes
+  unchanged. The subsequent [type-only extension](type-only-imports.md) adds
+  schema 2.0 and a view filter that also applies to these metrics. Metrics are not serialized into exports in this version.
 
 ## Acceptance requirements
 

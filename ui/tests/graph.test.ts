@@ -2,7 +2,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
-import { indexGraph, projectEdges, layout, PAGE_SIZE } from "../src/graph";
+import {
+  indexGraph,
+  projectEdges,
+  layout,
+  PAGE_SIZE,
+  withoutTypeOnly,
+} from "../src/graph";
 import type { Graph } from "../src/types";
 import { packageMetrics } from "../src/metrics";
 
@@ -200,5 +206,33 @@ test("MET-01/03: mutual dependencies count once in each direction, regardless of
   assert.equal(
     packageMetrics(noPolicy, indexGraph(noPolicy), "group:a")!.instability,
     0.5,
+  );
+});
+
+test("TC-03: filtering type-only sites preserves mixed edges, evidence, and package metrics", () => {
+  const graph = fixture("type_checking");
+  const original = JSON.stringify(graph);
+  const filtered = withoutTypeOnly(graph);
+  const index = indexGraph(filtered);
+  const full = packageMetrics(graph, indexGraph(graph), "group:a")!;
+  const metrics = packageMetrics(filtered, index, "group:a")!;
+  assert.equal(full.outgoing.length, 2);
+  assert.equal(metrics.outgoing.length, 1);
+  assert.equal(full.instability, 2 / 3);
+  assert.equal(metrics.instability, 1 / 2);
+  assert.equal(metrics.outgoing[0].node.name, "c");
+  assert.deepEqual(
+    metrics.outgoing[0].dependency.evidence.map((s) => s.line),
+    [12, 17],
+  );
+  assert(!filtered.edges.some((e) => e.evidence.some((s) => s.type_only)));
+  assert(!filtered.unresolved.some((r) => r.evidence.type_only));
+  assert.equal(JSON.stringify(graph), original);
+  assert.deepEqual(withoutTypeOnly(filtered), filtered);
+  const surviving = new Set(index.edges.map((e) => e.id));
+  assert(
+    filtered.edges.every((e) =>
+      e.supporting_edges.every((id) => surviving.has(id)),
+    ),
   );
 });

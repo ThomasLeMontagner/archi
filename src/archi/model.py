@@ -1,4 +1,4 @@
-"""Version 1 language-neutral interchange model (IR-01, IR-03).
+"""Version 2 language-neutral interchange model (IR-01, IR-03).
 
 No absolute host paths, timestamps, or Python AST objects enter this model.
 The strict decoder also serves as a dependency-free schema validator.
@@ -11,7 +11,7 @@ from pathlib import PurePosixPath
 from types import UnionType
 from typing import get_args, get_origin, get_type_hints
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "2.0"
 
 
 def stable_id(kind: str, *parts: object) -> str:
@@ -25,6 +25,7 @@ class Evidence:
     line: int
     column: int
     text: str
+    type_only: bool = False
 
 
 @dataclass(frozen=True)
@@ -186,7 +187,7 @@ def _evidence(items: tuple[Evidence, ...]) -> None:
 
 
 def _decode(expected: type, value):
-    """Decode JSON using the public dataclasses as the normative v1 schema."""
+    """Decode JSON using the public dataclasses as the normative v2 schema."""
     origin, args = get_origin(expected), get_args(expected)
     if origin is UnionType:
         for choice in args:

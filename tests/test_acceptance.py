@@ -216,7 +216,7 @@ class GraphAndRuleAcceptance(unittest.TestCase):
                     Graph.from_json(json.dumps(copied))
 
     def test_IR_03_deterministic_across_processes_locations_and_hash_seeds(self):
-        for name in ("src_layout", "cycles", "unresolved", "malformed", "forbidden"):
+        for name in ("src_layout", "cycles", "unresolved", "malformed", "forbidden", "type_checking"):
             with self.subTest(fixture=name), tempfile.TemporaryDirectory() as folder:
                 copied = Path(folder) / name
                 shutil.copytree(FIXTURES / name, copied)

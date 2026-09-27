@@ -93,6 +93,32 @@ import-based adaptation, not Martin's original class-based metric; Abstractness
 and a Stable Dependencies rule are not implemented. See the
 [metric decisions and acceptance notes](docs/package-metrics.md).
 
+## Type-only imports
+
+Archi labels imports inside recognized `if TYPE_CHECKING:` blocks **Type-only**
+(including `typing.TYPE_CHECKING` and explicit aliases imported from `typing`).
+They remain included by default. Uncheck **Include type-only imports in map and
+metrics** to hide those sites and recalculate package metrics. Ordinary sites on
+mixed dependencies remain visible. Export always retains every import.
+
+Lint policy is independent of the browser filter. To exclude recognized type-only
+sites from both cycle and forbidden-dependency checks:
+
+```toml
+[tool.archi]
+include-type-only = false
+```
+
+The default is `true`. The browser states the configured rule policy; opening a
+rule restores all imports so its evidence can be inspected. Recognition is
+conservative: shadowed names, compound/negated conditions and dynamic aliases
+remain ordinary imports. Excluding recognized type-only imports does not turn
+the static graph into a runtime execution graph.
+
+This unreleased change exports **graph schema 2.0**, adding a required
+`type_only` boolean to every evidence site. Schema 1.0 consumers need updating.
+See [type-only decisions and acceptance notes](docs/type-only-imports.md).
+
 ## Configuration
 
 Configuration is read only from the **target directory's** `pyproject.toml`.

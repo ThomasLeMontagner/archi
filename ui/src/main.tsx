@@ -11,6 +11,7 @@ import {
   EDGE_LIMIT,
   edgePath,
   indexGraph,
+  withoutTypeOnly,
   layout,
   PAGE_SIZE,
   projectEdges,
@@ -163,6 +164,7 @@ function Sites({ sites }: { sites: Site[] }) {
               <span>
                 {s.path}:{s.line}
               </span>
+              {s.type_only && <span className="badge">Type-only</span>}
             </div>
             <pre>
               <code>{s.text}</code>
@@ -405,8 +407,26 @@ function Search({
   );
 }
 
-function Explorer({ graph, project }: { graph: Graph; project: Project }) {
-  const index = useMemo(() => indexGraph(graph), [graph]);
+function Explorer({
+  graph: fullGraph,
+  project,
+}: {
+  graph: Graph;
+  project: Project;
+}) {
+  const [includeTypeOnly, setIncludeTypeOnly] = useState(true);
+  const graph = useMemo(
+    () => (includeTypeOnly ? fullGraph : withoutTypeOnly(fullGraph)),
+    [fullGraph, includeTypeOnly],
+  );
+  const index = useMemo(() => {
+    const result = indexGraph(graph);
+    if (!includeTypeOnly && fullGraph.analyzer.include_type_only !== "false") {
+      result.cycleEdges.clear();
+      result.cycleNodes.clear();
+    }
+    return result;
+  }, [graph, fullGraph, includeTypeOnly]);
   const [scope, setScope] = useState(index.root);
   const [page, setPage] = useState(0);
   const [selection, setSelection] = useState<Selection>(null);
@@ -545,6 +565,7 @@ function Explorer({ graph, project }: { graph: Graph; project: Project }) {
     requestAnimationFrame(() => searchButton.current?.focus());
   }
   function showDiagnostic(diagnostic: Diagnostic) {
+    setIncludeTypeOnly(true);
     const paths = diagnostic.nodes.map((id) =>
       ancestors(id, index).slice(0, -1),
     );
@@ -1177,6 +1198,32 @@ function Explorer({ graph, project }: { graph: Graph; project: Project }) {
               </button>
             </div>
           )}
+          <div className="type-import-controls">
+            <label>
+              <input
+                type="checkbox"
+                checked={includeTypeOnly}
+                onChange={(event) => {
+                  setIncludeTypeOnly(event.target.checked);
+                  setSelection((current) =>
+                    current?.kind === "node" ? current : null,
+                  );
+                  setHistory([]);
+                }}
+              />{" "}
+              Include type-only imports in map and metrics
+            </label>
+            <p className="small muted">
+              Rule checks{" "}
+              {fullGraph.analyzer.include_type_only === "false"
+                ? "exclude"
+                : "include"}{" "}
+              type-only imports (repository configuration). Opening a rule
+              restores all imports. JSON export always includes all imports.
+              Other conditional imports remain included; this is not a runtime
+              execution graph.
+            </p>
+          </div>
           <section className="map-panel" aria-label="Architecture view">
             <div className="map-heading">
               <div className="breadcrumbs">
@@ -1593,7 +1640,7 @@ function App() {
             "The local analysis server could not return this snapshot.",
           );
         const graph = (await g.json()) as Graph;
-        if (graph.schema_version !== "1.0")
+        if (graph.schema_version !== "2.0")
           throw new Error(
             "This graph version is not supported by the explorer.",
           );
