@@ -1,4 +1,4 @@
-# Commit comparison (unreleased)
+# Commit comparison (v0.3.0)
 
 This milestone adds `CMP-01` through `CMP-05` as extension requirements, building
 on AN-01/05, IR-01/02/03, RL-02 and UI-04/08. Interfaces, class/API signatures,
@@ -101,5 +101,5 @@ Validation completed on Linux / Python 3.12.3 / Chrome, 2026-09-27:
   an added dependency and verified its head-side file/line evidence in the browser.
 
 CMP-01 through CMP-05 are satisfied within the documented boundaries by these
-passing acceptance tests. The local wheel retains the development application
-version; this feature has not been released.
+passing acceptance tests. The original validation used a development wheel. This feature ships in v0.3.0;
+see the release notes for release-artifact validation.

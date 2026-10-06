@@ -5,6 +5,8 @@ in CI. It never imports or executes scanned code and has no runtime dependencies
 Requires Python 3.11+ and, for the explorer, a browser. The wheel includes the
 compiled React/TypeScript UI; Node is only needed to develop the UI.
 
+See the [v0.3.0 release notes](docs/releases/v0.3.0.md) for features and schema migration.
+
 ## Install and try it
 
 From this checkout:
@@ -115,7 +117,7 @@ conservative: shadowed names, compound/negated conditions and dynamic aliases
 remain ordinary imports. Excluding recognized type-only imports does not turn
 the static graph into a runtime execution graph.
 
-This unreleased change exports **graph schema 2.0**, adding a required
+Version 0.3.0 exports **graph schema 2.0**, adding a required
 `type_only` boolean to every evidence site. Schema 1.0 consumers need updating.
 See [type-only decisions and acceptance notes](docs/type-only-imports.md).
 
@@ -190,13 +192,13 @@ cd ..
 # Offline build when setuptools and wheel are already available:
 python3 -m pip wheel --no-deps --no-build-isolation --no-index . -w dist
 python3 -m venv /tmp/archi-smoke
-/tmp/archi-smoke/bin/python -m pip install --no-index --no-deps dist/archi_explorer-0.2.0-py3-none-any.whl
+/tmp/archi-smoke/bin/python -m pip install --no-index --no-deps dist/archi_explorer-0.3.0-py3-none-any.whl
 /tmp/archi-smoke/bin/archi check .
 ```
 
 The installable distribution is `archi-explorer`; the command and Python
 package are `archi`. Building needs setuptools and wheel, but the installed
-tool only needs Python and a browser. UI assets are checked in under
+tool only needs Python and a browser (plus Git for commit comparison). UI assets are checked in under
 `src/archi/static/`; `ui/build.mjs` rebuilds them from the locked frontend dependencies.
 The source distribution contains the UI sources, lockfile, tests, and build instructions.
 
@@ -205,7 +207,7 @@ For a wheel and source distribution, install the development build tool
 installed-wheel smoke test with:
 
 ```sh
-python3 tests/package_smoke.py dist/archi_explorer-0.2.0-py3-none-any.whl
+python3 tests/package_smoke.py dist/archi_explorer-0.3.0-py3-none-any.whl
 ```
 
 CI rebuilds the UI, checks that bundled assets match, runs Python and browser

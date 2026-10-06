@@ -1,4 +1,4 @@
-# Type-only imports (unreleased)
+# Type-only imports (v0.3.0)
 
 `TC-*` are new extension IDs, supplementing AN-02, IR-01/02/03, RL-01/04,
 UI-04/08 and MET-01/04. Package and Git-commit comparison remains deferred.
@@ -37,8 +37,7 @@ UI-04/08 and MET-01/04. Package and Git-commit comparison remains deferred.
   that the filtered graph still has the same cycle. Switching filters clears view
   history and stale dependency selections; selected nodes remain selected.
 - No new runtime dependency, repository execution, Git comparison, or API/class
-  extraction is introduced. The application release version is unchanged until
-  the next release; do not replace published v0.2.0 assets with this local build.
+  extraction is introduced. This feature ships in v0.3.0; published v0.2.0 assets remain unchanged.
 
 ## Acceptance evidence
 
