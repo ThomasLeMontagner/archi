@@ -33,11 +33,11 @@ jobs:
         working-directory: ui
       - run: python -m pip install build
       - run: python -m build
-      - run: python tests/package_smoke.py dist/archi_explorer-0.2.0-py3-none-any.whl
+      - run: python tests/package_smoke.py dist/archi_explorer-0.3.0-py3-none-any.whl
       - name: Install wheel for browser smoke
-        run: python -m pip install --no-deps --force-reinstall dist/archi_explorer-0.2.0-py3-none-any.whl
+        run: python -m pip install --no-deps --force-reinstall dist/archi_explorer-0.3.0-py3-none-any.whl
       - name: Exercise installed browser assets without Node in the server PATH
-        run: ARCHI_TEST_CLI="$(command -v archi)" npm run test:browser -- --grep 'aggregate arrow|desktop and narrow|external requests'
+        run: ARCHI_TEST_CLI="$(command -v archi)" npm run test:browser
         working-directory: ui
       - uses: actions/upload-artifact@v4
         if: always()

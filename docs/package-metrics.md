@@ -1,4 +1,4 @@
-# Informational package metrics (unreleased)
+# Informational package metrics (v0.3.0)
 
 This feature extends the Product Specification v0.1 after the v0.2.0 release.
 `MET-*` IDs below are new extension requirements, not pre-existing MVP IDs.
@@ -94,8 +94,8 @@ Validation on Linux / Python 3.12.3 / Chrome (2026-09-26):
 Run the focused checks with `npm --prefix ui test` and
 `npm --prefix ui run test:browser -- --grep 'MET-'`. To verify a wheel installation,
 set `ARCHI_TEST_CLI` to its virtual environment's `archi` executable when running
-the browser suite. The local validation wheel retains the development version;
-this feature has not been published in the v0.2.0 release.
+the browser suite. The original validation used a development wheel. This feature ships in v0.3.0;
+it is not part of v0.2.0.
 
 Abstractness, class analysis, metric-driven lint rules, thresholds, metric
 history and public JSON metric fields remain deferred. These metrics do not

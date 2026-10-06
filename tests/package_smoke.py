@@ -1,6 +1,6 @@
 """Offline installed-wheel acceptance (UX-01, CLI-01, OP-03).
 
-Usage: python tests/package_smoke.py dist/archi_explorer-0.2.0-py3-none-any.whl
+Usage: python tests/package_smoke.py dist/archi_explorer-0.3.0-py3-none-any.whl
 The only package installed is the supplied wheel; no Node or network is used.
 """
 import json
@@ -32,6 +32,12 @@ def main():
         env['PATH'] = str(binary)
         subprocess.run([str(python), '-m', 'pip', 'install', '--no-index', '--no-deps', str(wheel)],
                        check=True, cwd=root, env=env, stdout=subprocess.PIPE)
+        version = subprocess.check_output([str(python), '-c',
+            'from importlib.metadata import version; import archi; '
+            'assert version("archi-explorer") == archi.__version__; print(archi.__version__)'],
+            text=True, cwd=root, env=env).strip()
+        assert subprocess.check_output([str(cli), '--version'], text=True, cwd=root, env=env).strip() == version
+        assert version == wheel.name.split('-')[1]
         for arguments, code in [(['--help'], 0), (['check', str(project / 'tests/fixtures/regular')], 0),
                                 (['check', str(project / 'tests/fixtures/cycles')], 1),
                                 (['check', str(project / 'tests/fixtures/malformed')], 2)]:
