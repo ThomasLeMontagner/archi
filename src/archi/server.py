@@ -26,7 +26,7 @@ ASSETS = {
 
 
 def create_server(root: Path, graph: Graph, port: int = DEFAULT_PORT,
-                  analysis_seconds: float = 0.0) -> ThreadingHTTPServer:
+                  analysis_seconds: float = 0.0, comparison: dict | None = None) -> ThreadingHTTPServer:
     if not 0 <= port <= 65535:
         raise ValueError("Port must be between 0 and 65535 (0 selects a free port)")
     assets = {}
@@ -36,6 +36,11 @@ def create_server(root: Path, graph: Graph, port: int = DEFAULT_PORT,
         except FileNotFoundError as exc:
             raise ValueError("Explorer assets are missing; reinstall the wheel or run 'npm run build' in ui/") from exc
     assets["/api/graph"] = (graph.to_json().encode("utf-8"), "application/json; charset=utf-8")
+    if comparison is not None:
+        for side in ("base", "head"):
+            assets[f"/api/{side}-graph"] = (json.dumps(comparison[side], sort_keys=True).encode("utf-8"),
+                                           "application/json; charset=utf-8")
+    assets["/api/comparison"] = (json.dumps(comparison, sort_keys=True).encode("utf-8"), "application/json; charset=utf-8")
     assets["/api/project"] = (json.dumps({
         "name": root.name, "root": str(root.resolve()), "version": __version__,
         "analysis_seconds": round(analysis_seconds, 6),
@@ -92,8 +97,8 @@ def create_server(root: Path, graph: Graph, port: int = DEFAULT_PORT,
 
 
 def serve(root: Path, graph: Graph, *, port: int = DEFAULT_PORT,
-          open_browser: bool = True, analysis_seconds: float = 0.0) -> int:
-    with create_server(root, graph, port, analysis_seconds) as server:
+          open_browser: bool = True, analysis_seconds: float = 0.0, comparison: dict | None = None) -> int:
+    with create_server(root, graph, port, analysis_seconds, comparison) as server:
         url = f"http://127.0.0.1:{server.server_port}/"
         print(f"Archi explorer: {url}", flush=True)
         print(f"Repository: {root.resolve()}", flush=True)

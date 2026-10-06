@@ -119,6 +119,25 @@ This unreleased change exports **graph schema 2.0**, adding a required
 `type_only` boolean to every evidence site. Schema 1.0 consumers need updating.
 See [type-only decisions and acceptance notes](docs/type-only-imports.md).
 
+## Compare Git commits
+
+```sh
+archi compare /path/to/repository --base v0.2.0 --head HEAD
+archi compare /path/to/repository --base HEAD~1 --json > comparison.json
+```
+
+The browser shows added/removed packages, modules and dependencies, changed
+rule diagnostics, and before/after import evidence. Switch between module imports
+and package dependencies, or explore either snapshot's map. Evidence-only changes
+(such as imports moving lines) are separate and hidden by default.
+
+Both refs must exist locally; Git is required. Comparison reads committed trees
+without changing your checkout or executing repository code. Each commit uses its
+own configuration. Renames appear as removal plus addition; incomplete analysis
+marks missing-side observations uncertain. Exit codes are 0 for a complete
+comparison and 2 for incomplete analysis or errors. Differences alone do not fail.
+See [comparison decisions and acceptance notes](docs/commit-comparison.md).
+
 ## Configuration
 
 Configuration is read only from the **target directory's** `pyproject.toml`.

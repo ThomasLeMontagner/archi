@@ -1,13 +1,19 @@
 import { test, expect, type Page } from "@playwright/test";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { dirname, resolve } from "node:path";
-import { mkdir } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import axe from "axe-core";
 
 const root = resolve("..");
 let process: ChildProcess | null = null;
+let comparisonDirectory: string | null = null;
 
-async function open(page: Page, fixture: string) {
+async function open(
+  page: Page,
+  fixture: string,
+  commits?: { base: string; head: string },
+) {
   const target =
     fixture.startsWith("synthetic:") || fixture.startsWith("benchmark:")
       ? fixture
@@ -17,16 +23,45 @@ async function open(page: Page, fixture: string) {
   process = spawn(
     useInstalled ? installedCLI : "python3",
     useInstalled
-      ? [target, "--no-browser", "--port", "0"]
-      : ["tests/browser_host.py", target],
+      ? [
+          ...(commits
+            ? [
+                "compare",
+                target,
+                "--base",
+                commits.base,
+                "--head",
+                commits.head,
+              ]
+            : [target]),
+          "--no-browser",
+          "--port",
+          "0",
+        ]
+      : commits
+        ? [
+            "-m",
+            "archi",
+            "compare",
+            target,
+            "--base",
+            commits.base,
+            "--head",
+            commits.head,
+            "--no-browser",
+            "--port",
+            "0",
+          ]
+        : ["tests/browser_host.py", target],
     {
       cwd: root,
       env: {
         ...globalThis.process.env,
         PYTHONPATH: useInstalled ? "" : resolve(root, "src"),
-        PATH: useInstalled
-          ? dirname(installedCLI)
-          : globalThis.process.env.PATH,
+        PATH:
+          useInstalled && !commits
+            ? dirname(installedCLI)
+            : globalThis.process.env.PATH,
       },
       stdio: ["ignore", "pipe", "pipe"],
     },
@@ -58,7 +93,10 @@ async function open(page: Page, fixture: string) {
     () => performance.getEntriesByName("archi-interactive").length > 0,
   );
   await expect(
-    page.getByRole("heading", { name: "Architecture map", exact: true }),
+    page.getByRole("heading", {
+      name: commits ? "Architecture comparison" : "Architecture map",
+      exact: true,
+    }),
   ).toBeVisible();
   return url;
 }
@@ -72,6 +110,10 @@ test.afterEach(async () => {
     await stopped;
   }
   process = null;
+  if (comparisonDirectory) {
+    await rm(comparisonDirectory, { recursive: true, force: true });
+    comparisonDirectory = null;
+  }
 });
 
 test("AN-04 / IR-02 / UI-04: aggregate arrow opens every exact source site and underlying modules", async ({
@@ -824,4 +866,113 @@ test("TC-03: type-only evidence, map filtering, metrics, and independent rule sc
       ),
     ).toBe(true);
   }
+});
+
+async function openComparison(page: Page, malformed = false) {
+  comparisonDirectory = await mkdtemp(`${tmpdir()}/archi-browser-compare-`);
+  const fixture = spawnSync(
+    "python3",
+    [
+      "-c",
+      String.raw`
+import json, sys
+from pathlib import Path
+from tests.comparison_fixture import history, git
+root = Path(sys.argv[1])
+base, head = history(root)
+if sys.argv[2] == "true":
+    (root / "a/main.py").write_text("def broken(\n")
+    git(root, "add", ".")
+    git(root, "commit", "-qm", "Malformed")
+    head = git(root, "rev-parse", "HEAD")
+print(json.dumps({"base": base, "head": head}))
+`,
+      comparisonDirectory,
+      String(malformed),
+    ],
+    { cwd: root, encoding: "utf8" },
+  );
+  expect(fixture.status, fixture.stderr).toBe(0);
+  return open(page, comparisonDirectory, JSON.parse(fixture.stdout));
+}
+
+test("CMP-05: compare packages and dependencies, inspect both sides, and navigate snapshots", async ({
+  page,
+}) => {
+  const url = await openComparison(page);
+  const nodes = page.getByRole("region", {
+    name: "Package and module changes",
+  });
+  await expect(nodes).toContainText("newpkg");
+  await expect(nodes).toContainText("removed");
+  const dependencies = page.getByRole("region", { name: "Dependency changes" });
+  await expect(dependencies).not.toContainText("shift.client");
+  await page.getByLabel("Show evidence-only changes").check();
+  const moved = dependencies
+    .locator("details")
+    .filter({ hasText: "shift.client" });
+  await moved.locator("summary").click();
+  await expect(moved.getByLabel("Base import evidence")).toContainText(
+    "shift/client.py:1",
+  );
+  await expect(moved.getByLabel("Head import evidence")).toContainText(
+    "shift/client.py:3",
+  );
+  await page.getByLabel("Change status").selectOption("added");
+  await expect(nodes).not.toContainText("removed/gone.py");
+  await page.getByLabel("Dependency level").selectOption("group_dependency");
+  await expect(dependencies).toContainText("a → c");
+  await page.getByRole("button", { name: "Base map", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Architecture map", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Export JSON" })).toHaveAttribute(
+    "href",
+    "/api/base-graph",
+  );
+  const before = await (await page.request.get(`${url}api/base-graph`)).json();
+  expect(
+    before.nodes.some((n: { path: string }) => n.path === "removed/gone.py"),
+  ).toBe(true);
+  await page.getByRole("button", { name: "Head map", exact: true }).click();
+  await expect(page.getByRole("link", { name: "Export JSON" })).toHaveAttribute(
+    "href",
+    "/api/head-graph",
+  );
+  await page.getByRole("button", { name: "Changes", exact: true }).click();
+  for (const width of [1440, 768]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.evaluate(axe.source);
+    const results = await page.evaluate(async () => (window as any).axe.run());
+    expect(results.violations).toEqual([]);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+  }
+  const exported = await (
+    await page.request.get(`${url}api/comparison`)
+  ).json();
+  expect(exported.comparison_version).toBe("1.0");
+  expect(exported.complete).toBe(true);
+  await page.screenshot({
+    path: resolve(root, ".artifacts/comparison.png"),
+    fullPage: true,
+  });
+});
+
+test("CMP-03/05: provisional comparison explains missing evidence", async ({
+  page,
+}) => {
+  await openComparison(page, true);
+  await expect(page.getByRole("alert")).toContainText("Provisional comparison");
+  await page.getByLabel("Change status").selectOption("uncertain");
+  await expect(
+    page.getByRole("region", { name: "Dependency changes" }),
+  ).toContainText("a.main → b.peer");
+  await page
+    .getByText("Head analysis issues (1) and coverage", { exact: true })
+    .click();
+  await expect(page.getByText(/a\/main.py:1: Cannot parse/)).toBeVisible();
 });
