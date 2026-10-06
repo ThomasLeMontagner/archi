@@ -84,3 +84,23 @@ export type Selection =
   | { kind: "issues" }
   | { kind: "references" }
   | null;
+
+export interface Change<T> {
+  status: "added" | "removed" | "modified" | "evidence" | "uncertain";
+  before: T | null;
+  after: T | null;
+}
+export interface Comparison {
+  comparison_version: string;
+  base_commit: string;
+  head_commit: string;
+  complete: boolean;
+  configuration_changed: boolean;
+  base: Graph;
+  head: Graph;
+  changes: {
+    nodes: Change<GraphNode>[];
+    dependencies: Change<Omit<Edge, "count">>[];
+    diagnostics: Change<Diagnostic>[];
+  };
+}

@@ -1662,3 +1662,84 @@ p {
 .type-import-controls p {
   margin: 6px 0 0;
 }
+
+.comparison-header,
+.comparison-content {
+  padding: 24px;
+  max-width: 1400px;
+  margin: auto;
+}
+.comparison-header h1 {
+  margin: 0;
+}
+.comparison-header nav,
+.comparison-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+}
+.comparison-header button {
+  padding: 8px 14px;
+  border: 1px solid #b8c4bd;
+  border-radius: 6px;
+}
+.comparison-header button[aria-pressed="true"] {
+  background: #19594e;
+  color: white;
+}
+.comparison-filters label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.comparison-filters input,
+.comparison-filters select {
+  padding: 8px;
+  max-width: 100%;
+}
+.comparison-row {
+  padding: 14px;
+  margin: 8px 0;
+  border: 1px solid #c4cec6;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.comparison-row summary {
+  cursor: pointer;
+}
+.change-status {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 3px 6px;
+  margin-right: 8px;
+  background: #edf0ed;
+  color: #34463e;
+  border-radius: 4px;
+}
+.change-added {
+  background: #dbf1e2;
+  color: #164b2c;
+}
+.change-removed {
+  background: #fbe4e0;
+  color: #742b21;
+}
+.change-uncertain,
+.change-modified {
+  background: #fbefcd;
+  color: #61490c;
+}
+.comparison-evidence {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+@media (max-width: 800px) {
+  .comparison-evidence {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

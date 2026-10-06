@@ -24,6 +24,8 @@ import {
 } from "./metrics";
 import type {
   Camera,
+  Comparison,
+  Change,
   Diagnostic,
   Edge,
   Graph,
@@ -410,9 +412,11 @@ function Search({
 function Explorer({
   graph: fullGraph,
   project,
+  exportUrl = "/api/graph",
 }: {
   graph: Graph;
   project: Project;
+  exportUrl?: string;
 }) {
   const [includeTypeOnly, setIncludeTypeOnly] = useState(true);
   const graph = useMemo(
@@ -1052,7 +1056,7 @@ function Explorer({
         </button>
         <a
           className="export-button"
-          href="/api/graph"
+          href={exportUrl}
           download={`${project.name}-architecture.json`}
         >
           <Icon name="download" />
@@ -1623,19 +1627,290 @@ function Explorer({
   );
 }
 
-function App() {
-  const [data, setData] = useState<{ graph: Graph; project: Project } | null>(
-    null,
+function ComparisonView({
+  comparison,
+  project,
+}: {
+  comparison: Comparison;
+  project: Project;
+}) {
+  const [view, setView] = useState("changes");
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("all");
+  const [kind, setKind] = useState("imports");
+  const [showEvidence, setShowEvidence] = useState(false);
+  const labels = new Map(
+    [...comparison.base.nodes, ...comparison.head.nodes].map((n) => [
+      n.id,
+      n.name,
+    ]),
   );
+  const match = (change: Change<unknown>, text: string) =>
+    (status === "all" || change.status === status) &&
+    text.toLowerCase().includes(query.toLowerCase());
+  const nodes = comparison.changes.nodes.filter((c) =>
+    match(
+      c,
+      `${c.before?.name ?? ""} ${c.after?.name ?? ""} ${c.before?.path ?? ""} ${c.after?.path ?? ""}`,
+    ),
+  );
+  const dependencies = comparison.changes.dependencies.filter((c) => {
+    const edge = c.after ?? c.before!;
+    return (
+      edge.kind === kind &&
+      (showEvidence || status === "evidence" || c.status !== "evidence") &&
+      match(c, `${labels.get(edge.source)} ${labels.get(edge.target)}`)
+    );
+  });
+  const diagnostics = comparison.changes.diagnostics.filter((c) =>
+    match(c, (c.after ?? c.before!).message),
+  );
+  useEffect(() => {
+    performance.mark("archi-interactive");
+  }, []);
+  function badge(value: string) {
+    return (
+      <span className={`change-status change-${value}`}>
+        {value === "evidence" ? "Evidence changed" : value}
+      </span>
+    );
+  }
+  function evidence(before: Site[] | undefined, after: Site[] | undefined) {
+    return (
+      <div className="comparison-evidence">
+        <section aria-label="Base import evidence">
+          <h4>Base imports</h4>
+          {before?.length ? (
+            <Sites sites={before} />
+          ) : (
+            <p>No observed imports.</p>
+          )}
+        </section>
+        <section aria-label="Head import evidence">
+          <h4>Head imports</h4>
+          {after?.length ? (
+            <Sites sites={after} />
+          ) : (
+            <p>No observed imports.</p>
+          )}
+        </section>
+      </div>
+    );
+  }
+  return (
+    <>
+      <header className="comparison-header">
+        <h1>Architecture comparison</h1>
+        <p>
+          {project.name} · Base{" "}
+          <code>{comparison.base_commit.slice(0, 12)}</code> → Head{" "}
+          <code>{comparison.head_commit.slice(0, 12)}</code>
+        </p>
+        <nav aria-label="Comparison views">
+          <button
+            onClick={() => setView("changes")}
+            aria-pressed={view === "changes"}
+          >
+            Changes
+          </button>
+          <button
+            onClick={() => setView("base")}
+            aria-pressed={view === "base"}
+          >
+            Base map
+          </button>
+          <button
+            onClick={() => setView("head")}
+            aria-pressed={view === "head"}
+          >
+            Head map
+          </button>
+          <a href="/api/comparison" download="comparison.json">
+            Export comparison JSON
+          </a>
+        </nav>
+      </header>
+      {view !== "changes" ? (
+        <Explorer
+          key={view}
+          exportUrl={`/api/${view}-graph`}
+          graph={view === "base" ? comparison.base : comparison.head}
+          project={{ ...project, name: `${project.name} · ${view}` }}
+        />
+      ) : (
+        <main className="comparison-content">
+          {!comparison.complete && (
+            <div role="alert" className="metric-note">
+              <strong>Provisional comparison.</strong> One or both analyses are
+              incomplete. Uncertain entries are observations, not confirmed
+              additions or removals.
+            </div>
+          )}
+          {comparison.configuration_changed && (
+            <p role="note" className="metric-note">
+              Repository configuration changed. Each commit uses its own
+              pyproject.toml; differences may reflect configuration as well as
+              source changes.
+            </p>
+          )}
+          <p>
+            Committed files only. Renames appear as removal plus addition. Line,
+            statement, and site-count changes are separate from dependency
+            additions or removals. Type-only classification changes are marked
+            modified.
+          </p>
+          <div className="comparison-filters">
+            <label>
+              Find a package or module{" "}
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </label>
+            <label>
+              Change status{" "}
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+              >
+                <option value="all">All changes</option>
+                <option value="added">Added</option>
+                <option value="removed">Removed</option>
+                <option value="modified">Modified</option>
+                <option value="uncertain">Uncertain</option>
+                <option value="evidence">Evidence changed</option>
+              </select>
+            </label>
+            <label>
+              Dependency level{" "}
+              <select value={kind} onChange={(e) => setKind(e.target.value)}>
+                <option value="imports">Module imports</option>
+                <option value="group_dependency">Package dependencies</option>
+              </select>
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={showEvidence}
+                onChange={(e) => setShowEvidence(e.target.checked)}
+              />{" "}
+              Show evidence-only changes
+            </label>
+          </div>
+          <section aria-label="Package and module changes">
+            <h2>Packages and modules ({nodes.length})</h2>
+            {!nodes.length && <p>No matching package or module changes.</p>}
+            <Paged
+              key={`nodes:${query}:${status}`}
+              items={nodes}
+              label="node changes"
+              pageSize={20}
+              render={(c) => {
+                const node = c.after ?? c.before!;
+                return (
+                  <article className="comparison-row" key={node.id}>
+                    {badge(c.status)} <strong>{node.name}</strong>{" "}
+                    <span>{node.kind === "group" ? "Package" : "Module"}</span>
+                    <p>{node.path}</p>
+                  </article>
+                );
+              }}
+            />
+          </section>
+          <section aria-label="Dependency changes">
+            <h2>Dependencies ({dependencies.length})</h2>
+            {!dependencies.length && <p>No matching dependency changes.</p>}
+            <Paged
+              key={`edges:${query}:${status}:${kind}:${showEvidence}`}
+              items={dependencies}
+              label="dependency changes"
+              pageSize={20}
+              render={(c) => {
+                const edge = c.after ?? c.before!;
+                return (
+                  <details className="comparison-row" key={edge.id}>
+                    <summary>
+                      {badge(c.status)} {labels.get(edge.source)} →{" "}
+                      {labels.get(edge.target)}
+                    </summary>
+                    {evidence(c.before?.evidence, c.after?.evidence)}
+                  </details>
+                );
+              }}
+            />
+          </section>
+          <section aria-label="Rule changes">
+            <h2>Rule diagnostics ({diagnostics.length})</h2>
+            <p>
+              Added means newly reported; removed means no longer reported under
+              that commit’s rule configuration.
+            </p>
+            {!diagnostics.length && <p>No matching diagnostic changes.</p>}
+            <Paged
+              key={`rules:${query}:${status}`}
+              items={diagnostics}
+              label="diagnostic changes"
+              pageSize={20}
+              render={(c) => {
+                const rule = c.after ?? c.before!;
+                return (
+                  <details className="comparison-row" key={rule.id}>
+                    <summary>
+                      {badge(c.status)} {rule.message}
+                    </summary>
+                    {evidence(c.before?.evidence, c.after?.evidence)}
+                  </details>
+                );
+              }}
+            />
+          </section>
+          {(["base", "head"] as const).map((side) => (
+            <details key={side}>
+              <summary>
+                {side === "base" ? "Base" : "Head"} analysis issues (
+                {comparison[side].issues.length}) and coverage
+              </summary>
+              <p>
+                {comparison[side].unresolved.length} external, uncertain, or
+                unresolved references. Inspect the {side} map for reference
+                evidence. Unresolved references are not confirmed dependency
+                changes.
+              </p>
+              <Paged
+                items={comparison[side].issues}
+                label={`${side} issues`}
+                render={(issue) => (
+                  <p key={`${issue.path}:${issue.line}:${issue.code}`}>
+                    {issue.path}
+                    {issue.line ? `:${issue.line}` : ""}: {issue.message}
+                  </p>
+                )}
+              />
+            </details>
+          ))}
+        </main>
+      )}
+    </>
+  );
+}
+
+function App() {
+  const [data, setData] = useState<{
+    graph: Graph;
+    project: Project;
+    comparison: Comparison | null;
+  } | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {
     async function load() {
       try {
-        const [g, p] = await Promise.all([
+        const [g, p, c] = await Promise.all([
           fetch("/api/graph"),
           fetch("/api/project"),
+          fetch("/api/comparison"),
         ]);
-        if (!g.ok || !p.ok)
+        if (!g.ok || !p.ok || !c.ok)
           throw new Error(
             "The local analysis server could not return this snapshot.",
           );
@@ -1646,7 +1921,10 @@ function App() {
           );
         const project = await p.json();
         performance.mark("archi-data-ready");
-        setData({ graph, project });
+        const comparison = (await c.json()) as Comparison | null;
+        if (comparison && comparison.comparison_version !== "1.0")
+          throw new Error("Unsupported comparison version.");
+        setData({ graph, project, comparison });
       } catch (error) {
         setError(
           error instanceof Error ? error.message : "Unable to load analysis.",
@@ -1675,6 +1953,10 @@ function App() {
         <p role="status">Loading the local analysis snapshot…</p>
       </main>
     );
-  return <Explorer {...data} />;
+  return data.comparison ? (
+    <ComparisonView comparison={data.comparison} project={data.project} />
+  ) : (
+    <Explorer {...data} />
+  );
 }
 createRoot(document.getElementById("root")!).render(<App />);

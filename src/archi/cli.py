@@ -1,12 +1,15 @@
 """Browser and headless CLI (CLI-01, CLI-02)."""
 
 import argparse
+import json
 from pathlib import Path
 import sys
 from time import perf_counter
 
 from archi import __version__
 from archi.core import analyze
+from archi.comparison import compare_commits, comparison_json
+from archi.model import Graph
 from archi.server import DEFAULT_PORT, serve
 
 
@@ -24,14 +27,37 @@ def main(argv: list[str] | None = None) -> int:
     browse.add_argument("path", type=Path, nargs="?", default=Path("."), help="Repository directory (default: .)")
     browse.add_argument("--port", type=int, default=DEFAULT_PORT, help="Preferred loopback port; falls back if occupied")
     browse.add_argument("--no-browser", action="store_true", help="Print the local URL without opening a browser")
+    compare = subparsers.add_parser("compare", help="Compare two committed trees; open browser or export JSON")
+    compare.add_argument("path", type=Path, help="Git working tree (compares the entire repository)")
+    compare.add_argument("--base", required=True, help="Base commit or ref")
+    compare.add_argument("--head", default="HEAD", help="Head commit or ref (default: HEAD)")
+    compare.add_argument("--json", action="store_true", help="Write comparison JSON; exit 0 complete, 2 incomplete/error")
+    compare.add_argument("-o", "--output", type=Path, help="Write comparison JSON to a file instead of opening browser")
+    compare.add_argument("--no-browser", action="store_true")
+    compare.add_argument("--port", type=int, default=DEFAULT_PORT)
     arguments = list(sys.argv[1:] if argv is None else argv)
-    if not arguments or arguments[0] not in {"check", "export", "browse", "--help", "-h", "--version"}:
+    if not arguments or arguments[0] not in {"check", "export", "browse", "compare", "--help", "-h", "--version"}:
         arguments.insert(0, "browse")
     args = parser.parse_args(arguments)
     try:
-        if args.command == "browse" and not 0 <= args.port <= 65535:
+        if args.command in {"browse", "compare"} and not 0 <= args.port <= 65535:
             raise ValueError("Port must be between 0 and 65535")
         started = perf_counter()
+        if args.command == "compare":
+            comparison = compare_commits(args.path, args.base, args.head)
+            if args.json or args.output:
+                content = comparison_json(comparison)
+                if args.output:
+                    args.output.write_text(content, encoding="utf-8", newline="\n")
+                else:
+                    sys.stdout.write(content)
+            else:
+                serve(args.path.resolve(), Graph.from_json(json.dumps(comparison["head"])),
+                      port=args.port, open_browser=not args.no_browser,
+                      analysis_seconds=perf_counter() - started, comparison=comparison)
+            if not comparison["complete"]:
+                print("archi: Comparison is provisional; inspect issues in both snapshots.", file=sys.stderr)
+            return 0 if comparison["complete"] else 2
         graph = analyze(args.path)
         if args.command == "browse":
             return serve(args.path.resolve(), graph, port=args.port, open_browser=not args.no_browser,
